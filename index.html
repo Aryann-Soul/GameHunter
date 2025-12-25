@@ -7,7 +7,7 @@
     <style>
         body { background-color: #121212; color: white; font-family: -apple-system, sans-serif; margin: 0; padding-top: 60px; padding-bottom: 40px; }
         header { position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: rgba(20,20,20,0.95); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(10px); }
-        h1 { font-size: 20px; font-weight: 800; margin: 0; letter-spacing: 1px; }
+        h1 { font-size: 20px; font-weight: 800; margin: 0; letter-spacing: 1px; color: #fff; }
         .container { padding: 15px; }
         .card { background: #1e1e1e; border-radius: 12px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         .card img { width: 100%; height: 180px; object-fit: cover; }
@@ -18,21 +18,39 @@
         .free { color: #00e676; font-weight: 900; font-size: 16px; margin-right: 10px; }
         .old { text-decoration: line-through; color: #666; font-size: 14px; }
         .btn { display: block; background: #2979ff; color: white; text-align: center; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; }
-        .loader { text-align: center; margin-top: 50px; color: #666; }
+        .error-msg { text-align: center; color: #ff5252; padding: 20px; }
+        .loader { text-align: center; margin-top: 50px; color: #888; }
     </style>
 </head>
 <body>
     <header><h1>GAME HUNTER</h1></header>
     <div class="container" id="list">
-        <div class="loader">Scanning for games...</div>
+        <div class="loader">
+            Connecting to satellite...<br>
+            <small>(This may take 5 seconds)</small>
+        </div>
     </div>
     <script>
-        fetch("https://www.gamerpower.com/api/giveaways")
-        .then(r => r.json())
+        // We use the JSON-Wrapper method to bypass CORS strictly
+        const targetUrl = "https://www.gamerpower.com/api/giveaways";
+        const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(targetUrl);
+
+        fetch(proxyUrl)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(data => {
+            // AllOrigins wraps the data in a 'contents' string. We must parse it again.
+            const games = JSON.parse(data.contents);
+            
             const list = document.getElementById('list');
-            const active = data.filter(g => g.status === "Active");
-            if(active.length === 0) { list.innerHTML = '<div class="loader">No games found.</div>'; return; }
+            const active = games.filter(g => g.status === "Active");
+            
+            if(active.length === 0) { 
+                list.innerHTML = '<div class="loader">No free games found today. Check back later!</div>'; 
+                return; 
+            }
             
             list.innerHTML = active.map(g => `
                 <div class="card">
@@ -44,12 +62,19 @@
                             <span class="free">FREE</span>
                             <span class="old">${g.worth}</span>
                         </div>
-                        <a href="${g.open_giveaway_url}" class="btn">GET IT</a>
+                        <a href="${g.open_giveaway_url}" class="btn">GET DEAL</a>
                     </div>
                 </div>
             `).join('');
         })
-        .catch(e => document.getElementById('list').innerHTML = '<div class="loader">Error loading.</div>');
+        .catch(e => {
+            document.getElementById('list').innerHTML = `
+                <div class="error-msg">
+                    <h3>Connection Failed</h3>
+                    <p>${e.message}</p>
+                    <button onclick="location.reload()" style="padding:10px 20px; margin-top:10px;">Retry</button>
+                </div>`;
+        });
     </script>
 </body>
 </html>
